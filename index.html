@@ -1,0 +1,367 @@
+<html>
+<head>
+    <meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="jquery.mobile-1.4.5.css">
+    <link href="https://fonts.googleapis.com/css?family=Lobster|Open+Sans|PT+Sans" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=PT+Sans" rel="stylesheet"> 
+    <script src="jquery-1.11.3.min.js"></script>
+    <script src="jquery.mobile-1.4.5.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/5.7.2/firebase.js"></script>
+    <style>
+        @keyframes spinner {
+          to {transform: rotate(360deg);}
+        }
+        .spinner:before {
+          content: '';
+          box-sizing: border-box;
+          position: absolute;
+          top: 30%;
+          left: 50%;
+          width: 20px;
+          height: 20px;
+          margin-top: -10px;
+          margin-left: -10px;
+          border-radius: 50%;
+          border: 2px solid transparent;
+          border-top-color: #07d;
+          border-bottom-color: #07d;
+          animation: spinner .8s ease infinite;
+        }
+        #pagethree>.ui-content {
+            text-align: center;
+        }
+        li>a:hover {
+            cursor: default;
+        }
+        #pageone {
+        background: url(images/wallpaper.jpg);
+        background-repeat:no-repeat;
+        background-position:center center;
+        background-size:cover;  
+        }
+        #pageone>.ui-content {
+            text-align: center;
+            margin: 0 auto;
+        }
+        #pageone>.ui-content>p {
+            text-align: center;
+            font-family: 'Lobster', cursive;
+            font-weight: lighter;
+            font-size: 35px;
+            margin-bottom: 40px;
+        }
+        .ui-btn {
+            font-weight: lighter;
+            font-family: 'PT Sans', sans-serif;
+        }
+    </style>
+    <script>
+        // Initialize Firebase //
+        var config = {
+            apiKey: "AIzaSyDUEriZwilULeK5gYP4p3l0cFDxlWykdmA",
+            authDomain: "mad2ca1-aa1b0.firebaseapp.com",
+            databaseURL: "https://mad2ca1-aa1b0.firebaseio.com",
+            projectId: "mad2ca1-aa1b0",
+            storageBucket: "mad2ca1-aa1b0.appspot.com",
+            messagingSenderId: "1015268877275"
+        };
+        firebase.initializeApp(config);
+        // Global functions and variables //
+        var selectedFile;
+        function formatDate(date) {
+            var monthNames = [
+            "January", "February", "March",
+            "April", "May", "June", "July",
+            "August", "September", "October",
+            "November", "December"
+            ];
+            var day = date.getDate();
+            var monthIndex = date.getMonth();
+            var year = date.getFullYear();
+            return day + ' ' + monthNames[monthIndex] + ' ' + year;
+        };
+        function uploadFile() {
+            $('#results').html("Results loading...");
+            $('#results').addClass('spinner');
+            $("#logresultsbutton").hide();
+            var filename = selectedFile.name;
+            var storageRef = firebase.storage().ref('/foodImages/' + filename);
+            var uploadTask = storageRef.put(selectedFile);
+            // Register three observers:
+            // 1. 'state_changed' observer, called any time the state changes
+            // 2. Error observer, called on failure
+            // 3. Completion observer, called on successful completion
+            uploadTask.on('state_changed', function (snapshot) {
+                // Observe state change events such as progress, pause, and resume
+                var progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                $("#uploadprogress").html('Upload is ' + progress + '% done...');
+                switch (snapshot.state) {
+                    case firebase.storage.TaskState.PAUSED: // or 'paused'
+                    $("#uploadprogress").html('Upload is paused');
+                    break;
+                    case firebase.storage.TaskState.RUNNING: // or 'running'
+                    console.log('Upload is running');
+                    break;
+                };
+            }, function (error) {
+                // Handle unsuccessful uploads
+            }, function () {
+                // Handle successful uploads on complete
+                // For instance, get the download URL: https://firebasestorage.googleapis.com/...
+                storageRef.getDownloadURL().then(function (url) {
+                    downloadURL = url;
+                    console.log(downloadURL);
+                    recognize(downloadURL);
+                });
+                window.location = "#pagethree";
+                $("#uploadprogress").html(' ');
+            });
+        };
+        function recognize(url) {
+            $.ajax({
+                url: "https://southcentralus.api.cognitive.microsoft.com/customvision/v2.0/Prediction/8c328839-e148-46ba-9813-e1b8aab6a720/url",
+                beforeSend: function (xhrObj) {
+                    xhrObj.setRequestHeader("Content-Type", "application/json");
+                    xhrObj.setRequestHeader("Prediction-Key", "13f5da9038cd42988ca864bcf074f1d2");
+                },
+                type: "POST",
+                data: JSON.stringify({ Url: url })
+            })
+                .done(function (data) {
+                    console.log("success" + JSON.stringify(data));
+                    var food = data.predictions[0].tagName
+                    var probability = data.predictions[0].probability
+                    console.log("Probability: " + probability);
+                    $.getJSON("https://api.nutritionix.com/v1_1/search/" + food + "?results=0%3A1&cal_min=0&cal_max=999999&fields=item_name%2Cbrand_name%2Citem_id%2Cbrand_id&appId=c0421161&appKey=8e40c67a08bad0c18c6eaaf67d9ef369", function (jsonOBJ) {
+                        console.log(jsonOBJ)
+                        var itemid = jsonOBJ.hits[0].fields.item_id
+                        console.log(itemid)
+                        $.getJSON("https://api.nutritionix.com/v1_1/item?id=" + itemid + "&appId=c0421161&appKey=8e40c67a08bad0c18c6eaaf67d9ef369", function (jsonOBJ2) {
+                            console.log(jsonOBJ2)
+                            var calories = jsonOBJ2.nf_calories
+                            var cholestrol = jsonOBJ2.nf_cholesterol
+                            var fiber = jsonOBJ2.nf_dietary_fiber
+                            var protein = jsonOBJ2.nf_protein
+                            var fat = jsonOBJ2.nf_total_fat
+                            var sodium = jsonOBJ2.nf_sodium
+                            var sugar = jsonOBJ2.nf_sugars
+                            var carbohydrate = jsonOBJ2.nf_total_carbohydrate
+                            console.log(food)
+                            $('#results').html(food + "</br>" + "Calories: " + calories + " kcal" + "</br>" + "Cholestrol: " + cholestrol + "</br>"
+                                + "Fiber: " + fiber + "</br>" + "Protein: " + protein + "<br/>" + "Fat: " + fat + "<br/>" + "Sodium: " + sodium);
+                            $('#results').removeClass('spinner');
+                            $("#logresultsbutton").show();
+                            var cls = calories;
+                            var ft = fat;
+                            var sdm = sodium;
+                            var fd = food;
+                            var ref = firebase.database().ref().child("nutrition");
+                            var pushref = ref.push({
+                                Calories: cls,
+                                Sodium: sdm,
+                                Fat: ft,
+                                Food: fd,
+                                createdDate: firebase.database.ServerValue.TIMESTAMP
+                            });
+                        });
+                    });
+                })
+                .fail(function (error) {
+                    // alert("error" + JSON.stringify(error));
+                });
+        };
+        function queryData() {
+            var s = "";
+            var b = "";
+            var arr = [];
+            var ref = firebase.database().ref().child("nutrition");
+            var query = ref.orderByKey().limitToLast(100);
+            query.on("child_added", function (snapshot) {
+                var calories =  snapshot.val().Calories; 
+                var foodname = snapshot.val().Food; 
+                var DateCreated = formatDate(new Date(snapshot.val().createdDate)); 
+                s = s + "<li><a href=#>" + foodname + "</br>" + calories  +" Kcals </br>" + DateCreated +"</a></li>";
+                b = calories;
+                arr.push(b);
+                console.log(arr);
+                var sum = 0;
+                for (var i = 0; i < arr.length; i++) {
+                    sum += arr[i];
+                }
+                console.log(sum)
+                $('#logresults').html(s);
+                $("#logresults").listview('refresh');
+                $('#logtotal').html("Total calories consumed: " + sum + " Kcals");
+            });    
+        };
+        // On change events //
+        $(document).on("pagecreate", "#pageone", function () {
+            $("#uploadButton").hide();
+            $('#btnRegister').on('tap', function () {
+                console.log('register button tapped');
+                var user = $('#txtreguser').val();
+                var pass = $('#txtregpass').val();
+                var name = $('#txtregname').val();
+                var name2 = $('#txtregname2').val();
+                var promise = firebase.auth().createUserWithEmailAndPassword(user, pass);
+                promise.then(function () {
+                    console.log("Successful Registration!");
+                    alert("Succesfull registration! Redirecting you to login page...");
+                    window.location = "#pagelogin";
+                }).catch(function (error) {
+                    console.log("Error registering..." + error.message);
+                });
+            });
+            $('#btnLogin').on('tap', function () {
+                console.log('Login button tapped');
+                var user = $('#txtloguser').val();
+                var pass = $('#txtlogpass').val();
+                var promise = firebase.auth().signInWithEmailAndPassword(user, pass);
+                promise.then(function () {
+                    console.log("Successful Login!");
+                    alert('User is logged in');
+                    var currentUser = firebase.auth().currentUser;
+                    firebase.auth().onAuthStateChanged(function(user) {
+                        if (user) {
+                        window.location = '#pagetwo';
+                        };
+                    });
+                    $('#txtloguser').val('');
+                    $('#txtlogpass').val('');
+                }).catch(function (error) {
+                    alert("Error logging in... " + error.message);
+                });
+            });
+            $('#btnLogout').on('tap', function(){
+  				var promise = firebase.auth().signOut();
+  				promise.then(function (){
+    				console.log('Logout successful');
+					alert("Succesfully logged out!");
+					$(':mobile-pagecontainer').pagecontainer("change", "#pageone", {role: "page"});
+ 			    });
+		    });
+        });
+        $(document).on("pageshow", "#pagetwo", function () {
+            firebase.auth().onAuthStateChanged(function(user) {
+  				if(!user) {
+    			window.location = '#pageone';
+ 				};
+			});
+        });
+        $(document).on("pageshow", "#pagethree", function () {
+            firebase.auth().onAuthStateChanged(function(user) {
+  				if(!user) {
+    			window.location = '#pageone';
+ 				};
+			});
+        });
+        $(document).on("pageshow", "#pagefour", function () {
+            firebase.auth().onAuthStateChanged(function(user) {
+  				if(!user) {
+    			window.location = '#pageone';
+ 				};
+			});
+            queryData();
+            $('#clearLog').on('tap', function(){
+                firebase.database().ref().child("nutrition").remove();
+                $(':mobile-pagecontainer').pagecontainer("change", "#pagetwo", {role: "page"});
+            });
+        });
+    </script>
+</head>
+<body>
+    <div data-role="page" id="pageone">
+		<div data-role="header">
+			<title>Welcome to SeeFood!</title>
+		</div>
+		<div data-role="main" class="ui-content">
+            <p>Welcome to SeeFood!</p>
+            <div data-role="controlgroup">
+                <a href='#pagelogin' class='ui-btn'  data-transition="slidefade">Login</a>
+                <a href='#pageregister' class='ui-btn' data-transition="slidefade">Register</a>
+            </div>
+        </div>
+    </div>
+    <div data-role="page" id="pageregister">
+		<div data-role="header">
+			<title>Register your account</title>
+			<h1>Registration</h1>
+		</div>
+		<div data-role="main" class="ui-content"> 
+			<label for="txtreguser">Enter email</label>
+			<input type='email' id='txtreguser' placeholder="abc@gmail.com">
+			<label for="txtregpass">Enter password</label>
+			<input type='password' id='txtregpass' placeholder="Must have at least 6 characters">
+			<label for="txtregname">Enter first name</label>
+			<input type='text' id='txtregname' placeholder="John">
+			<label for="txtregname2">Enter last name</label>
+			<input type='text' id='txtregname2' placeholder="Tan">
+            <div data-role="controlgroup">
+                <button id='btnRegister' data-transition="slidefade">Register</button>
+                <a class="ui-btn" data-rel="back" data-transition="slidefade">Back</a>
+            </div>
+		</div>
+	</div> 
+    <div data-role="page" id="pagelogin">
+        <div data-role="header">
+            <title>Log in to your account</title>
+            <h1>Login</h1>
+        </div>
+        <div data-role="main" class="ui-content">
+            <label for="txtloguser">Enter email</label>
+            <input type='email' id='txtloguser' placeholder="abc@gmail.com">
+            <label for="txtlogpass">Enter password</label>
+            <input type='password' id='txtlogpass' placeholder="Must have at least 6 characters">
+            <div data-role="controlgroup">
+                <button id='btnLogin' data-transition="slidefade">Login</button>
+                <a class="ui-btn" data-rel="back" data-transition="slidefade">Back</a>
+            </div>
+        </div>
+    </div>
+    <div data-role="page" id="pagetwo">
+        <div data-role="header">
+            <h1>SeeFood</h1>
+        </div>
+        <div data-role="main" class="ui-content">
+            <label for='file'>Choose an image from your device</label>
+            <input id='file' type='file' accept="image/*"  capture="camera" />
+            <button id='uploadButton' type='button' onclick="uploadFile()">Submit</button>
+            <p id='uploadprogress'></p>
+        </div>
+    </div>
+    <div data-role="page" id="pagethree">
+        <div data-role="header">
+            <h1>SeeFood</h1>
+        </div>
+        <div data-role="main" class="ui-content">
+            <div id='results'></div>
+            <br>
+            <a href="#pagefour" data-role="button" id="logresultsbutton">Log results</a>
+        </div>
+    </div>
+    <div data-role="page" id="pagefour">
+        <div data-role="header">
+            <h1>Logged results</h1>
+        </div>
+        <div data-role="main" class="ui-content">
+            <ul id='logresults' data-role='listview' data-icon='false'>
+            </ul>
+        </div>
+        <div data-role="footer" class="ui-content"> 
+            <div id='logtotal'></div>
+            <div data-role="controlgroup" data-type="horizontal">
+                <button id='clearLog' type='button'>Reset logged results</button>
+                <a href="#pagetwo" data-role="button">Log more food</a>
+                <button id='btnLogout' data-transition="slidefade">Log out</button>
+            </div>
+        </div>
+    </div>
+    </body>
+<script>
+    $("#file").on("change", function(event){
+        selectedFile = event.target.files[0];
+        $("#uploadButton").show();
+    });
+</script>
+</html>
